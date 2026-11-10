@@ -1,0 +1,20 @@
+# 运行产物（每次跑都很大，不进仓）
+runs/
+**/impl/
+node_modules/
+.pnpm-store/
+
+# 本地数据与密钥
+*.db
+*.db-wal
+*.db-shm
+.env
+.env.local
+
+# 编辑器 / 系统
+.DS_Store
+Thumbs.db
+*.swp
+
+# 内测记录，不公开
+history/

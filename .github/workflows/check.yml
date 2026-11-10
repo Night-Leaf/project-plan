@@ -1,0 +1,66 @@
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 流程模型没有死路
+        run: node scripts/flow-check.mjs
+
+      - name: 条件死锁检查
+        run: node scripts/guard-check.mjs
+
+      - name: 模板还能过检查器
+        run: node scripts/test-templates.mjs
+
+      - name: 合批检查测试
+        run: node scripts/test-batch.mjs
+
+      - name: 正确样本应通过
+        run: node scripts/check-plan.mjs scripts/test/mini/plan.md scripts/test/mini/req.md
+
+      - name: 反例样本应报错（这里失败才算对）
+        run: |
+          if node scripts/check-plan.mjs scripts/test/neg/plan.md scripts/test/neg/req.md; then
+            echo "反例竟然通过了，检查器坏了"
+            exit 1
+          fi
+
+      - name: status 测试
+        run: node scripts/test-status.mjs
+
+      - name: check-final 测试
+        run: node scripts/test-check-final.mjs
+
+      - name: check-dispatch 测试
+        run: node scripts/test-check-dispatch.mjs
+
+      - name: 路径卫生（scripts/ 不许出现本机路径、用户名或 run 名）
+        run: |
+          if grep -RInE 'D:\\|C:\\Users\\|Night-Leaf|runs/' scripts/; then
+            echo "路径卫生失败：scripts/ 里出现本机路径、用户名或 runs/ 引用"
+            exit 1
+          fi
+
+      - name: 干净 checkout 复跑三个新测试
+        run: |
+          tmp=$(mktemp -d)
+          git ls-files -z | tar --null -T - -cf - | tar -xf - -C "$tmp"
+          cp scripts/status.mjs scripts/check-final.mjs scripts/check-dispatch.mjs \
+             scripts/test-status.mjs scripts/test-check-final.mjs scripts/test-check-dispatch.mjs \
+             "$tmp/scripts/"
+          test ! -d "$tmp/runs"
+          cd "$tmp"
+          node scripts/test-status.mjs
+          node scripts/test-check-final.mjs
+          node scripts/test-check-dispatch.mjs
